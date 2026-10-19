@@ -1,0 +1,5 @@
+# key = MAC of any NIC (or DMI serial), hostname = short name or FQDN, ntp = optional, ";"-separated
+key,hostname,ntp,vlan,address,gateway,dns,search
+00:00:5E:00:53:01,hvm-01.example.com,192.0.2.1;192.0.2.2,100,192.0.2.11/24,192.0.2.1,192.0.2.53;192.0.2.54,example.com
+00:00:5E:00:53:02,hvm-02.example.com,192.0.2.1;192.0.2.2,100,192.0.2.12/24,192.0.2.1,192.0.2.53;192.0.2.54,example.com
+00:00:5E:00:53:03,hvm-03.example.com,,100,192.0.2.13/24,192.0.2.1,192.0.2.53,example.com

@@ -1,0 +1,28 @@
+# HOSTNAME=hvm-02.example.com
+# NTP=192.0.2.1,192.0.2.2
+network:
+  bonds:
+    bond0:
+      interfaces:
+      - enp1s0
+      - enp2s0
+      parameters:
+        lacp-rate: fast
+        mode: 802.3ad
+        transmit-hash-policy: layer2
+  ethernets:
+    enp1s0: {}
+    enp2s0: {}
+  version: 2
+  vlans:
+    bond0.100:
+      addresses:
+      - 192.0.2.12/24
+      id: 100
+      link: bond0
+      nameservers:
+        addresses: [192.0.2.53, 192.0.2.54]
+        search: [example.com]
+      routes:
+      - to: default
+        via: 192.0.2.1

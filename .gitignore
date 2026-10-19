@@ -1,0 +1,4 @@
+# Created by the quick start - site data and secrets, never commit
+hash.txt
+/netcfg/
+*.iso

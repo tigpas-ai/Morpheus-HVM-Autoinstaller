@@ -1,20 +1,57 @@
 # Morpheus Autoinstaller
 
-How to turn the original HPE HVM installation ISO (HPE Morpheus 9.1) into an unattended installer for HVM nodes:
-a USB stick that installs a node without any input.
+Turn the original HPE HVM installation ISO (HPE Morpheus Software 9.1) into an **unattended installer** for HVM
+nodes: boot it, and the node installs itself with its own host name and network configuration – no input needed.
 
-Status: being set up.
+The ISO already runs an Ubuntu autoinstall; HPE only leaves four screens interactive. This repository answers those
+screens in `server/user-data` (a small, reviewable patch against the original) and adds one network file per node.
+Nothing else on the ISO changes.
 
-## Planned content
-- How the autoinstall that is already built into the ISO works (Ubuntu autoinstall, `user-data`), at a high level,
-  and where it has to be extended.
-- The extensions: answers for the interactive steps, per-node network configuration (`netcfg/`), and how to generate
-  a node's network file from one manual installation (then only the host name and optionally NTP servers are added
-  as comments).
-- Two fixes that apply **only to 9.1.0-1**: Postfix (`postfix check` / `set-permissions` on first boot) and the
-  repository key (`apt-key` → keyring).
+> Made for **HPE HVM 9.1.0-1** (`HPE_HVM_Install_26.04_S6E64-11270.iso`). The patch applies only without fuzz; a different
+> `server/user-data` gives a warning or an error. Two fixes are included that are valid **only for 9.1.0-1** – see
+> [docs/fixes-9.1.0-1.md](docs/fixes-9.1.0-1.md).
 
-Out of scope: performance tuning and other site-specific additions.
+## Contents
+| Path | What |
+|---|---|
+| [docs/how-it-works.md](docs/how-it-works.md) | the autoinstall built into the ISO and where it is extended – **start here** |
+| [docs/netcfg.md](docs/netcfg.md) | node files: format, taking one from a manual installation, generating them from CSV |
+| [docs/build.md](docs/build.md) | building the ISO or updating a USB stick, booting, checks |
+| [docs/fixes-9.1.0-1.md](docs/fixes-9.1.0-1.md) | Postfix and repository-key fixes (9.1.0-1 only) |
+| [server/user-data.patch](server/user-data.patch) | the changes against the original `server/user-data` |
+| [scripts/](scripts/) | `gen-netcfg.sh` (CSV → node files), `build-iso.sh` (new ISO), `update-stick.sh` (writable stick), `check.sh`, `make-user-data.sh` |
+| [examples/](examples/) | CSV, templates and generated node files (placeholder values) |
+| [tests/run.sh](tests/run.sh) | tests of the scripts |
+
+## Quick start
+```bash
+# 1. Node files: one per node, from a CSV and a template (or copied from a manual installation)
+scripts/gen-netcfg.sh -t examples/netcfg-template.yaml -o netcfg examples/nodes.csv
+
+# 2. Password hash for the local admin user
+mkpasswd -m sha-512 > hash.txt
+
+# 3. New ISO next to the original (the original is only read)
+scripts/build-iso.sh -u hvmadmin -p hash.txt -n netcfg \
+  HPE_HVM_Install_26.04_S6E64-11270.iso HPE_HVM_Install_26.04_autoinstall.iso
+
+# 4. Write it to a USB stick (or mount it virtually) and boot the node from it
+sudo dd if=HPE_HVM_Install_26.04_autoinstall.iso of=/dev/sdX bs=4M conv=fsync status=progress
+```
+
+**Booting the medium erases the target disk without asking.** Details and checks: [docs/build.md](docs/build.md).
+
+Requirements: `bash`, `patch`, `xorriso` (for `build-iso.sh`); python3 with PyYAML for the YAML checks (optional).
+
+## Scope
+Only the unattended installation itself plus the two 9.1.0-1 fixes. No performance tuning, no extra packages, no
+site-specific settings – add those to your own copy of the patch if needed.
+
+## References
+- [HPE Morpheus Software documentation 9.1.0](https://support.hpe.com/hpesc/public/docDisplay?docId=sd00008772en_us&docLocale=en_US)
+  – chapter "HVM Clusters" (hardware requirements, provisioning the cluster)
+- [Ubuntu autoinstall reference](https://canonical-subiquity.readthedocs-hosted.com/en/latest/reference/autoinstall-reference.html)
 
 ## License
-MIT (planned).
+[MIT](LICENSE). HPE, HPE Morpheus and HVM are trademarks of Hewlett Packard Enterprise. This project is not affiliated
+with HPE; the ISO itself is not part of it.

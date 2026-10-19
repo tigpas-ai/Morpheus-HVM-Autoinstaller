@@ -1,0 +1,12 @@
+network:
+  ethernets:
+    enp1s0:
+      addresses:
+      - @ADDRESS@
+      nameservers:
+        addresses: [@DNS@]
+        search: [@SEARCH@]
+      routes:
+      - to: default
+        via: @GATEWAY@
+  version: 2

@@ -1,0 +1,134 @@
+--- user-data-original
++++ user-data
+@@ -11,6 +11,13 @@
+   refresh-installer:
+     update: false
+ 
++  # autoinstall: answers for the identity screen (no interactive step).
++  # The host name is a placeholder; the real one comes from the node's netcfg file.
++  identity:
++    hostname: hvm-node
++    username: "@USERNAME@"
++    password: "@PASSWORD_HASH@"
++
+   timezone: "America/Denver"
+   keyboard:
+     layout: us
+@@ -19,17 +26,87 @@
+     search_drivers: false
+     id: ubuntu-server-minimal
+ 
+-  interactive-sections:
+-    - locale
+-    - identity
+-    - network
+-    - storage
++  # autoinstall: no interactive sections – everything is answered in this file.
++  #interactive-sections:
++  #  - locale
++  #  - identity
++  #  - network
++  #  - storage
+ 
+   # Explicit storage layout avoids Subiquity 26.04 filesystem NoneType crash.
++  # autoinstall: without "match" the largest disk is used. To pin the target disk, add e.g.
++  #   match:
++  #     path: /dev/sda
+   storage:
+     layout:
+       name: direct
+ 
++  # autoinstall: find this node's file in server/netcfg/ (DMI serial number first, then the MAC
++  # address of any interface) and switch the installer network off (no DHCP wait).
++  early-commands:
++    - |
++      set -eu
++      NETCFG=/cdrom/server/netcfg
++      RAW=$(dmidecode -s system-serial-number 2>/dev/null || true)
++      SERIAL=$(printf '%s' "$RAW" | tr -d ' \n' | tr '[:upper:]' '[:lower:]')
++      case "$SERIAL" in
++        ""|defaultstring|tobefilledbyo.e.m.|tobefilledbyoem|notspecified|none|na|systemserialnumber|0)
++          SERIAL="" ;;
++      esac
++      KEY=""
++      if [ -n "$SERIAL" ] && [ -f "$NETCFG/$SERIAL.yaml" ]; then
++        KEY="$SERIAL"
++      else
++        for IFACE in $(ls /sys/class/net); do
++          [ "$IFACE" = lo ] && continue
++          M=$(tr '[:upper:]:' '[:lower:]-' < "/sys/class/net/$IFACE/address" 2>/dev/null || true)
++          [ -n "$M" ] || continue
++          if [ -f "$NETCFG/$M.yaml" ]; then KEY="$M"; break; fi
++        done
++      fi
++      if [ -z "$KEY" ]; then
++        echo "ERROR: no file in $NETCFG for serial '$SERIAL' or any MAC address. Aborting." >&2
++        for IFACE in $(ls /sys/class/net); do
++          [ "$IFACE" = lo ] && continue
++          echo "  $IFACE: $(cat "/sys/class/net/$IFACE/address" 2>/dev/null || true)" >&2
++        done
++        sleep 180
++        exit 1
++      fi
++      mkdir -p /run/autoinstall-netcfg
++      printf '%s' "$KEY" > /run/autoinstall-netcfg/key
++      rm -f /etc/netplan/*.yaml
++      printf 'network:\n  version: 2\n  ethernets: {}\n' > /etc/netplan/99-empty.yaml
++      chmod 600 /etc/netplan/99-empty.yaml
++      netplan apply 2>/dev/null || true
++
++  # autoinstall: put the node's network file and host name where the HPE first-boot scripts
++  # (configure_mgmt_ip.sh, configure_node.sh) expect them; optional NTP servers for chrony.
++  late-commands:
++    - |
++      set -eu
++      KEY=$(cat /run/autoinstall-netcfg/key)
++      SRC=/cdrom/server/netcfg/$KEY.yaml
++      CFG=/target/opt/HPE/installer-config
++      HN=$(sed -n 's/^# HOSTNAME=//p' "$SRC" | head -n 1 | tr -d ' \r')
++      [ -n "$HN" ] || { echo "ERROR: no '# HOSTNAME=' line in $SRC" >&2; exit 1; }
++      mkdir -p "$CFG"
++      echo "${HN%%.*}" > "$CFG/hostname"
++      cp "$SRC" "$CFG/00-installer-config.yaml"
++      chmod 600 "$CFG/00-installer-config.yaml"
++      NTPS=$(sed -n 's/^# NTP=//p' "$SRC" | head -n 1 | tr -d ' \r')
++      SOURCES=/target/etc/chrony/sources.d
++      if [ -n "$NTPS" ] && [ -d "$SOURCES" ]; then
++        if [ -f "$SOURCES/ubuntu-ntp-pools.sources" ]; then
++          sed -i 's/^pool /#pool /' "$SOURCES/ubuntu-ntp-pools.sources"
++        fi
++        for NTP in $(echo "$NTPS" | tr ',' ' '); do
++          echo "server $NTP iburst"
++        done > "$SOURCES/autoinstall.sources"
++      elif [ -n "$NTPS" ]; then
++        echo "WARNING: $SOURCES not found, NTP servers not set" >&2
++      fi
++
+   user-data:
+     power_state:
+       mode: reboot
+@@ -77,4 +154,24 @@
+           sig_key="/etc/apt/keyrings/zion_repo_public.key"
+           echo -e "Types: deb\nURIs: $update_repo\nSuites: resolute-updates\nComponents: main\nCheck-Valid-Until: False\nTrusted: True\nsigned-by: $sig_key\n" >> "$file_path"
+         '
++      # FIX - ONLY FOR HPE HVM 9.1.0-1 (remove for any other version): repair Postfix
++      # ownership and permissions (e.g. "postfix/postlog: warning: not owned by root").
++      - |
++        bash -c '
++          postfix check
++          postfix set-permissions
++        '
++      # FIX - ONLY FOR HPE HVM 9.1.0-1 (remove for any other version): the HPE repository key
++      # is ASCII-armored, but apt only accepts armored keys with the .asc extension (apt-secure(8)).
++      # Convert it to a binary keyring in place (only if it is still armored).
++      - |
++        bash -c '
++          key="/etc/apt/keyrings/zion_repo_public.key"
++          if grep -q "BEGIN PGP PUBLIC KEY BLOCK" "$key"; then
++            tmp=$(mktemp)
++            gpg --dearmor < "$key" > "$tmp"
++            install -m 0644 "$tmp" "$key"
++            rm -f "$tmp"
++          fi
++        '
+   shutdown: reboot
