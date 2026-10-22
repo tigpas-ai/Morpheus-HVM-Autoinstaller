@@ -77,6 +77,44 @@ nothing else has to change. This is also why a node file can be taken from one m
 Not handled: the proxy field of the network screen (`proxy-url`). If you need it, add a late-command that writes
 `/target/opt/HPE/installer-config/proxy-url`.
 
+## Choosing the target disk
 The target disk is chosen by the `direct` layout: without `match` Subiquity takes the **largest disk**. With
-several disks, pin it in `storage.layout.match` (e.g. `path: /dev/sda` or `serial: …`, see the autoinstall
-reference).
+several disks, pin it with `match` under `storage.layout` – the patch contains a commented example. The keys are
+described in the [autoinstall reference](https://canonical-subiquity.readthedocs-hosted.com/en/latest/reference/autoinstall-reference.html)
+(section "storage"):
+
+| Match | Selects | Note |
+|---|---|---|
+| `path: /dev/sda` | the kernel device name | names can change with more disks or USB media |
+| `model: "…"` | the **device type** (udev `ID_MODEL`) | same for all nodes with the same disk model – usually the best choice for one hardware type |
+| `vendor: "…"` | udev `ID_VENDOR` | often only the bus (`ATA`), rarely useful alone |
+| `serial: "…"` | one physical disk (udev `ID_SERIAL`) | differs per node; `ID_SERIAL` is usually model **and** serial number (`<model>_<serial>`), so use a glob such as `"*_<serial>"` |
+| `ssd: true` | any non-rotational disk | combined with `size: largest`/`smallest` to pick among several |
+
+`model`, `vendor`, `serial`, `path` are shell-style globs (`*`, `?`), compared **case-sensitively**; all keys
+given must match. `match` may also be a list – the first entry that finds a disk wins, e.g. a model first and the
+largest disk as fallback:
+
+```yaml
+  storage:
+    layout:
+      name: direct
+      match:
+        - model: "EXAMPLE_SSD_500*"
+        - size: largest
+```
+
+### Finding the device type
+The value Subiquity compares is the udev property `ID_MODEL`, in which **spaces are replaced by `_`** – it is
+**not** the model as shown by `lsblk`. Read it on any running Linux on the same hardware, or in the shell of the
+**original** (interactive) ISO: boot it, wait for the first screen, then "Help › Enter shell". Do not do this with
+the autoinstall medium – it erases the disk without stopping.
+
+```bash
+lsblk -d -o NAME,TRAN,ROTA,SIZE,MODEL,SERIAL         # overview: which disk is which (ROTA 0 = SSD)
+udevadm info --query=property /dev/sdX | grep -E '^ID_(MODEL|VENDOR|SERIAL)='
+```
+
+Example: `lsblk` shows `EXAMPLE SSD 500`, `udevadm` shows `ID_MODEL=EXAMPLE_SSD_500` → `model: "EXAMPLE_SSD_500*"`.
+After an installation, `/var/log/installer/subiquity-server-debug.log` on the node shows the disks Subiquity
+considered and the one it chose (`grep -E 'considering \[|For match|No devices satisfy'`).

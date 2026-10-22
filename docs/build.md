@@ -62,7 +62,8 @@ the script can be repeated, e.g. after adding a node. `server/netcfg/` is replac
 - The GRUB entry of the ISO starts the autoinstall after its 30 s timeout. The ISO has boot images for
   legacy BIOS and UEFI; the autoinstall itself does not depend on the boot mode.
 - **The target disk is erased without asking.** Without `match` in the storage layout the largest disk is used
-  ([how-it-works.md](how-it-works.md#where-the-autoinstaller-extends-it)).
+  – to choose it by path, device type (model) or SSD, see
+  [how-it-works.md](how-it-works.md#choosing-the-target-disk).
 - If no node file matches, the installer prints the MAC addresses of all interfaces on the console, waits
   3 minutes and aborts – add a file for one of them.
 - Installation, first boot and the second reboot take roughly 10–15 minutes, depending on the hardware.

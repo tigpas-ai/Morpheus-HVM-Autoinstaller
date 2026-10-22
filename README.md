@@ -43,6 +43,21 @@ sudo dd if=HPE_HVM_Install_26.04_autoinstall.iso of=/dev/sdX bs=4M conv=fsync st
 
 Requirements: `bash`, `patch`, `xorriso` (for `build-iso.sh`); python3 with PyYAML for the YAML checks (optional).
 
+## By hand – without the scripts
+The scripts only automate a few file operations. Everything can be done by hand on a writable USB stick made from
+the original ISO (e.g. with Rufus, FAT32):
+
+1. **Read the patch** [`server/user-data.patch`](server/user-data.patch) – it is short and every change is marked with
+   `# autoinstall:` or `# FIX`. On the stick, rename `server/user-data` to `server/user-data-original` and create the
+   new `server/user-data` from it: apply the patch (`patch -o server/user-data server/user-data-original
+   user-data.patch`) or make the same changes in an editor.
+2. **Fill in** `@USERNAME@` and `@PASSWORD_HASH@` (hash from `mkpasswd -m sha-512`).
+3. **Create the folder `server/netcfg/`** with one `<mac>.yaml` per node – the netplan file from a manual
+   installation plus the lines `# HOSTNAME=` and optionally `# NTP=`. Format and where to get the file:
+   [docs/netcfg.md](docs/netcfg.md); ready-made examples: [examples/netcfg/](examples/netcfg/).
+
+That is the whole autoinstaller. The scripts add checks on top ([docs/build.md](docs/build.md#checks)).
+
 ## Scope
 Only the unattended installation itself plus the two 9.1.0-1 fixes. No performance tuning, no extra packages, no
 site-specific settings – add those to your own copy of the patch if needed.
@@ -52,6 +67,9 @@ site-specific settings – add those to your own copy of the patch if needed.
   – chapter "HVM Clusters" (hardware requirements, provisioning the cluster)
 - [Ubuntu autoinstall reference](https://canonical-subiquity.readthedocs-hosted.com/en/latest/reference/autoinstall-reference.html)
 
+## Author
+Pascal Liehne
+
 ## License
-[MIT](LICENSE). HPE, HPE Morpheus and HVM are trademarks of Hewlett Packard Enterprise. This project is not affiliated
+[MIT](LICENSE), © 2026 Pascal Liehne. HPE, HPE Morpheus and HVM are trademarks of Hewlett Packard Enterprise. This project is not affiliated
 with HPE; the ISO itself is not part of it.

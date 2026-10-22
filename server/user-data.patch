@@ -14,7 +14,7 @@
    timezone: "America/Denver"
    keyboard:
      layout: us
-@@ -19,17 +26,87 @@
+@@ -19,16 +26,87 @@
      search_drivers: false
      id: ubuntu-server-minimal
  
@@ -31,13 +31,14 @@
 +  #  - storage
  
    # Explicit storage layout avoids Subiquity 26.04 filesystem NoneType crash.
-+  # autoinstall: without "match" the largest disk is used. To pin the target disk, add e.g.
-+  #   match:
-+  #     path: /dev/sda
++  # autoinstall: without "match" the largest disk is used. To pin the target disk, uncomment and adapt
++  # "match" below (path, model, ssd, ... - see docs/how-it-works.md).
    storage:
      layout:
        name: direct
- 
++      #match:
++      #  path: /dev/sda
++
 +  # autoinstall: find this node's file in server/netcfg/ (DMI serial number first, then the MAC
 +  # address of any interface) and switch the installer network off (no DHCP wait).
 +  early-commands:
@@ -103,11 +104,10 @@
 +      elif [ -n "$NTPS" ]; then
 +        echo "WARNING: $SOURCES not found, NTP servers not set" >&2
 +      fi
-+
+ 
    user-data:
      power_state:
-       mode: reboot
-@@ -77,4 +154,24 @@
+@@ -77,4 +155,24 @@
            sig_key="/etc/apt/keyrings/zion_repo_public.key"
            echo -e "Types: deb\nURIs: $update_repo\nSuites: resolute-updates\nComponents: main\nCheck-Valid-Until: False\nTrusted: True\nsigned-by: $sig_key\n" >> "$file_path"
          '
