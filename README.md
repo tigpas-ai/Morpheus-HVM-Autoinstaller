@@ -1,4 +1,4 @@
-# Morpheus Autoinstaller
+# Morpheus HVM Autoinstaller
 
 Turn the original HPE HVM installation ISO (HPE Morpheus Software 9.1) into an **unattended installer** for HVM
 nodes: boot it, and the node installs itself with its own host name and network configuration – no input needed.
