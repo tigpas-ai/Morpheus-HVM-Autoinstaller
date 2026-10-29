@@ -6,12 +6,23 @@
 Both fixes are the last two entries of `user-data.runcmd` (first boot, after the HPE steps) and are marked
 `# FIX - ONLY FOR HPE HVM 9.1.0-1` in [`server/user-data.patch`](../server/user-data.patch).
 
-## Postfix permissions
+## Postfix permissions and queue directories
 **Symptom:** after the first boot, Postfix reports wrong ownership, e.g. in `/var/log/cloud-init-output.log`:
 
 ```
 postfix/postlog: warning: not owned by root: /var/spool/postfix/etc/resolv.conf
 ```
+
+On a running node the log of the Morpheus agent shows, every few seconds, warnings from `postdrop`:
+
+```
+postfix/postdrop[120771]: warning: mail_queue_enter: create file maildrop/…: No such file or directory
+```
+
+**Cause:** on the installed HVM node the queue directories of Postfix are missing – `/var/spool/postfix` contains only
+the subdirectory `dev`. The `postfix` service is masked and not running, so nothing ever creates them. Local programs
+such as `sudo` still hand their notifications to `postdrop`, which tries to enter them into the `maildrop` directory –
+and that does not exist.
 
 **Fix:**
 
@@ -20,8 +31,13 @@ postfix check
 postfix set-permissions
 ```
 
-`postfix check` refreshes the files of the Postfix chroot and reports problems, `postfix set-permissions` sets
-ownership and modes of the Postfix files and directories as the package expects them.
+`postfix check` refreshes the files of the Postfix chroot, creates missing queue directories and reports problems,
+`postfix set-permissions` sets ownership and modes of the Postfix files and directories as the package expects them.
+Neither command needs the service to run, so the masked `postfix` unit can stay as it is; `postdrop` then finds
+`maildrop` and the warnings stop.
+
+**Check:** `ls /var/spool/postfix` lists the queue directories (`maildrop`, `incoming`, `active`, …, not only `dev`) and
+the `postdrop` warnings no longer appear.
 
 ## Repository key (`apt-key` → keyring)
 **Symptom:** the HPE first-boot steps write `/etc/apt/sources.list.d/hpe-ubuntu.sources` with
