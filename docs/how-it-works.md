@@ -68,6 +68,7 @@ The extension only changes `server/user-data` ([`server/user-data.patch`](../ser
 | `interactive-sections` commented out | no screen is shown any more |
 | `early-commands` | find the node's file in `server/netcfg/` – by DMI serial number, else by the MAC address of any interface; abort with a list of MAC addresses if none matches. Switch the installer network off so it does not wait for DHCP. |
 | `late-commands` | do what the network screen would have done: copy the node's file to `/target/opt/HPE/installer-config/00-installer-config.yaml`, write the host name from its `# HOSTNAME=` line to `…/hostname`; optional `# NTP=` servers for chrony. The placeholder host name from `identity` is replaced by `configure_node.sh` on the first boot. |
+| a second `late-commands` entry | runs the [add-ons](#add-ons) on the medium, if there are any (otherwise it does nothing) |
 | two `runcmd` entries at the end | [fixes for 9.1.0-1 only](fixes-9.1.0-1.md) |
 
 Because the HPE first-boot scripts find their input files exactly where the manual installation leaves them,
@@ -76,6 +77,22 @@ nothing else has to change. This is also why a node file can be taken from one m
 
 Not handled: the proxy field of the network screen (`proxy-url`). If you need it, add a late-command that writes
 `/target/opt/HPE/installer-config/proxy-url`.
+
+## Add-ons
+The repository itself contains no extras, but the medium can carry additional folders that the installer runs at
+the end of the installation – for site-specific settings or separately maintained packages. Convention:
+
+- An add-on is a flat folder, copied as a whole to `server/addons/<name>/` on the medium (`build-iso.sh -a`,
+  `update-stick.sh -a`, repeatable; `<name>` is the folder name, which must be unique).
+- Entry point: `bash <folder>/install.sh <folder> <target-root>`. `<folder>` is the add-on's path on the medium
+  (`/cdrom/server/addons/<name>`), `<target-root>` is the installed system (`/target`). The script is started with
+  `bash` because FAT32 and ISO 9660 carry no file permissions.
+- The script must be idempotent and must not need the network (the installer network is off). Exit code 0 means
+  success; anything else aborts the installation.
+- Checking and versioning are the add-on's own business, not the installer's.
+
+The add-ons run in alphabetical order of their folder names, in the last `late-commands` entry, after the node's
+network file has been put in place.
 
 ## Choosing the target disk
 The target disk is chosen by the `direct` layout: without `match` Subiquity takes the **largest disk**. With

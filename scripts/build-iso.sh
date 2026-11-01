@@ -2,7 +2,7 @@
 # build-iso.sh - create an autoinstall ISO from the original HPE HVM installation ISO.
 #
 # Usage:
-#   build-iso.sh -u USERNAME [-p HASH_FILE] -n NETCFG_DIR [-f] ORIGINAL_ISO OUTPUT_ISO
+#   build-iso.sh -u USERNAME [-p HASH_FILE] -n NETCFG_DIR [-a ADDON_DIR]... [-f] ORIGINAL_ISO OUTPUT_ISO
 #
 #   ORIGINAL_ISO   original HPE HVM ISO (only read, never changed)
 #   OUTPUT_ISO     new ISO to write (must not exist unless -f is given)
@@ -10,12 +10,14 @@
 #   -p HASH_FILE   file holding the crypted password ("-" = stdin);
 #                  default: environment variable PASSWORD_HASH
 #   -n NETCFG_DIR  directory with one <mac|serial>.yaml per node (see docs/netcfg.md)
+#   -a ADDON_DIR   add-on folder (repeatable), see docs/how-it-works.md; must contain install.sh
 #   -f             overwrite OUTPUT_ISO
 #
 # The new ISO is the original plus:
 #   /server/user-data           original + server/user-data.patch (placeholders filled in)
 #   /server/user-data-original  the unchanged original, for reference
 #   /server/netcfg/             the node files from NETCFG_DIR
+#   /server/addons/<name>/      each ADDON_DIR (name = folder name), run at the end of the installation
 # Boot records (BIOS and UEFI El Torito, hybrid MBR/GPT) are replayed from the original.
 # Requires: xorriso, patch; python3 with PyYAML for the full syntax check (optional).
 set -euo pipefail
@@ -24,12 +26,13 @@ usage() { sed -n '2,/^set -euo/p' "$0" | sed '$d; s/^# \{0,1\}//'; exit "${1:-2}
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
-user="" hash_file="" netcfg="" force=0
-while getopts "u:p:n:fh" opt; do
+user="" hash_file="" netcfg="" force=0 addons=()
+while getopts "u:p:n:a:fh" opt; do
   case "$opt" in
     u) user=$OPTARG ;;
     p) hash_file=$OPTARG ;;
     n) netcfg=$OPTARG ;;
+    a) addons+=("$OPTARG") ;;
     f) force=1 ;;
     h) usage 0 ;;
     *) usage ;;
@@ -51,6 +54,14 @@ trap 'rm -rf "$work"' EXIT
 
 echo "== checking $netcfg"
 "$HERE/check.sh" "$netcfg"
+addon_maps=()
+if [ ${#addons[@]} -gt 0 ]; then
+  echo "== checking add-ons"
+  check_args=()
+  for a in "${addons[@]}"; do check_args+=(-a "$a"); done
+  "$HERE/check.sh" "${check_args[@]}"
+  for a in "${addons[@]}"; do addon_maps+=(-map "$(realpath "$a")" "/server/addons/$(basename "$(realpath "$a")")"); done
+fi
 
 echo "== extracting /server/user-data from $iso"
 if ! xorriso -osirrox on -indev "$iso" -extract /server/user-data "$work/user-data-original" \
@@ -75,6 +86,7 @@ if ! xorriso -indev "$iso" -outdev "$out" \
     -map "$work/user-data" /server/user-data \
     -map "$work/user-data-original" /server/user-data-original \
     -map "$work/netcfg" /server/netcfg \
+    ${addon_maps[@]+"${addon_maps[@]}"} \
     -boot_image any replay >"$work/xorriso.log" 2>&1; then
   tail -n 20 "$work/xorriso.log" >&2
   rm -f "$out"

@@ -14,7 +14,7 @@
    timezone: "America/Denver"
    keyboard:
      layout: us
-@@ -19,16 +26,87 @@
+@@ -19,16 +26,95 @@
      search_drivers: false
      id: ubuntu-server-minimal
  
@@ -104,10 +104,18 @@
 +      elif [ -n "$NTPS" ]; then
 +        echo "WARNING: $SOURCES not found, NTP servers not set" >&2
 +      fi
++    # autoinstall: add-ons (optional folders under server/addons/, see docs/how-it-works.md): run the
++    # install.sh of each one against the target. No add-on: nothing happens. A failure aborts the install.
++    - |
++      for d in /cdrom/server/addons/*/; do
++        [ -f "${d}install.sh" ] || continue
++        echo "add-on: ${d%/}"
++        bash "${d}install.sh" "${d%/}" /target || exit 1
++      done
  
    user-data:
      power_state:
-@@ -77,4 +155,24 @@
+@@ -77,4 +163,24 @@
            sig_key="/etc/apt/keyrings/zion_repo_public.key"
            echo -e "Types: deb\nURIs: $update_repo\nSuites: resolute-updates\nComponents: main\nCheck-Valid-Until: False\nTrusted: True\nsigned-by: $sig_key\n" >> "$file_path"
          '
