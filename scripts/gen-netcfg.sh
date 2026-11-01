@@ -35,7 +35,7 @@ while getopts "t:o:fh" opt; do
   esac
 done
 shift $((OPTIND - 1))
-[ $# -eq 1 ] && [ -n "$template" ] && [ -n "$outdir" ] || usage
+if [ $# -ne 1 ] || [ -z "$template" ] || [ -z "$outdir" ]; then usage; fi
 csv=$1
 [ -f "$csv" ] || { echo "error: $csv not found" >&2; exit 1; }
 [ -f "$template" ] || { echo "error: $template not found" >&2; exit 1; }
@@ -61,8 +61,10 @@ while IFS= read -r line || [ -n "$line" ]; do
       [[ " ${header[*]} " != *" ${f,,} "* ]] || { echo "error: $csv:$lineno: column '$f' twice" >&2; exit 1; }
       header+=("${f,,}")
     done
-    [[ " ${header[*]} " == *" key "* ]] && [[ " ${header[*]} " == *" hostname "* ]] ||
-      { echo "error: $csv: columns 'key' and 'hostname' are required" >&2; exit 1; }
+    if [[ " ${header[*]} " != *" key "* ]] || [[ " ${header[*]} " != *" hostname "* ]]; then
+      echo "error: $csv: columns 'key' and 'hostname' are required" >&2
+      exit 1
+    fi
     continue
   fi
   [ ${#fields[@]} -le ${#header[@]} ] ||

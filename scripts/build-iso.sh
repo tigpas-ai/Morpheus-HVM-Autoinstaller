@@ -36,7 +36,7 @@ while getopts "u:p:n:fh" opt; do
   esac
 done
 shift $((OPTIND - 1))
-[ $# -eq 2 ] && [ -n "$user" ] && [ -n "$netcfg" ] || usage
+if [ $# -ne 2 ] || [ -z "$user" ] || [ -z "$netcfg" ]; then usage; fi
 iso=$1 out=$2
 
 command -v xorriso >/dev/null || { echo "error: xorriso not found (package xorriso)" >&2; exit 1; }
