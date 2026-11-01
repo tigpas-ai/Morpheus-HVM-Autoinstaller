@@ -33,7 +33,7 @@ while getopts "o:u:p:h" opt; do
   esac
 done
 shift $((OPTIND - 1))
-[ $# -eq 1 ] && [ -n "$out" ] && [ -n "$user" ] || usage
+if [ $# -ne 1 ] || [ -z "$out" ] || [ -z "$user" ]; then usage; fi
 orig=$1
 
 [ -f "$orig" ] || { echo "error: $orig not found" >&2; exit 1; }

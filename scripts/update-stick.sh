@@ -32,12 +32,14 @@ while getopts "u:p:n:h" opt; do
   esac
 done
 shift $((OPTIND - 1))
-[ $# -eq 1 ] && [ -n "$user" ] && [ -n "$netcfg" ] || usage
+if [ $# -ne 1 ] || [ -z "$user" ] || [ -z "$netcfg" ]; then usage; fi
 stick=$1
 srv=$stick/server
 
-[ -f "$srv/user-data" ] && [ -f "$stick/casper/vmlinuz" ] ||
-  { echo "error: $stick does not look like a stick made from the HPE HVM ISO" >&2; exit 1; }
+if [ ! -f "$srv/user-data" ] || [ ! -f "$stick/casper/vmlinuz" ]; then
+  echo "error: $stick does not look like a stick made from the HPE HVM ISO" >&2
+  exit 1
+fi
 [ -w "$srv" ] || { echo "error: $srv is not writable" >&2; exit 1; }
 
 echo "== checking $netcfg"
