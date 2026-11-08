@@ -2,7 +2,7 @@
 
 All notable changes to this project. The release notes on GitHub are taken from the section of the version.
 
-## Unreleased
+## 0.2.0 – 2026-11-08
 - Add-ons: `build-iso.sh -a` and `update-stick.sh -a` put extension folders on the medium as
   `server/addons/<name>/`; a final `late-commands` entry runs each `install.sh` against `/target` and aborts the
   installation on failure. `check.sh -a` checks the folders. See `docs/how-it-works.md`.
