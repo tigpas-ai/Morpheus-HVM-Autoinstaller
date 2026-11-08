@@ -1,0 +1,40 @@
+name: Release
+
+# Runs when a version tag (v<version>) is pushed: checks that CHANGELOG.md has a section for that version,
+# runs ShellCheck and the tests and publishes a GitHub release with the notes from that section.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - name: Release notes from CHANGELOG.md
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          awk -v v="$version" '
+            $0 ~ "^## " v "( |$)" { found = 1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          if [[ ! -s release-notes.md ]]; then
+            echo "No CHANGELOG.md section found for $version" >&2
+            exit 1
+          fi
+      - name: ShellCheck
+        run: shellcheck scripts/*.sh tests/run.sh
+      - name: Tests (without the original ISO)
+        run: tests/run.sh
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "${GITHUB_REF_NAME#v}" --notes-file release-notes.md --verify-tag
