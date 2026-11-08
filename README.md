@@ -10,6 +10,7 @@ Nothing else on the ISO changes.
 > Made for **HPE HVM 9.1.0-1** (`HPE_HVM_Install_26.04_S6E64-11270.iso`). The patch applies only without fuzz; a different
 > `server/user-data` gives a warning or an error. Two fixes are included that are valid **only for 9.1.0-1** – see
 > [docs/fixes-9.1.0-1.md](docs/fixes-9.1.0-1.md).
+> Source: <https://github.com/tigpas-ai/Morpheus-HVM-Autoinstaller>
 
 ## Contents
 | Path | What |
@@ -22,6 +23,7 @@ Nothing else on the ISO changes.
 | [scripts/](scripts/) | `gen-netcfg.sh` (CSV → node files), `build-iso.sh` (new ISO), `update-stick.sh` (writable stick), `check.sh`, `make-user-data.sh` |
 | [examples/](examples/) | CSV, templates and generated node files (placeholder values) |
 | [tests/run.sh](tests/run.sh) | tests of the scripts |
+| [SECURITY.md](SECURITY.md) | reporting a vulnerability, design rules that limit the impact |
 
 ## Quick start
 ```bash
