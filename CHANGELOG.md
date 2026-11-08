@@ -3,6 +3,13 @@
 All notable changes to this project are documented in this file. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+- Add-ons: `build-iso.sh -a` and `update-stick.sh -a` put extension folders on the medium as
+  `server/addons/<name>/`; a final `late-commands` entry runs each `install.sh` against `/target` and aborts the
+  installation on failure. `check.sh -a` checks the folders. See `docs/how-it-works.md`.
+
 ## [0.1.0] - 2026-10-31
 
 ### Added

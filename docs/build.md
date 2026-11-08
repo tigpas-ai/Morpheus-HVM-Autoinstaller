@@ -56,7 +56,18 @@ scripts/update-stick.sh -u hvmadmin -p hash.txt -n netcfg /mnt
 ```
 
 The first run moves `server/user-data` to `server/user-data-original`; later runs build from that file again, so
-the script can be repeated, e.g. after adding a node. `server/netcfg/` is replaced completely.
+the script can be repeated, e.g. after adding a node. `server/netcfg/` and `server/addons/` are replaced completely
+(a run without `-a` removes the add-ons from the stick).
+
+## Add-ons
+Both scripts accept `-a ADDON_DIR`, repeatable, for each [add-on](how-it-works.md#add-ons) folder:
+
+```bash
+scripts/build-iso.sh -u hvmadmin -p hash.txt -n netcfg -a ./my-addon ORIGINAL.iso NEW.iso
+```
+
+The folder is stored as `server/addons/<folder name>/`. `check.sh -a ADDON_DIR` checks that it contains an
+`install.sh` with valid syntax and a unique name.
 
 ## Booting
 - The GRUB entry of the ISO starts the autoinstall after its 30 s timeout. The ISO has boot images for
@@ -84,7 +95,7 @@ The new ISO:
 
 ```bash
 xorriso -indev NEW.iso -report_el_torito plain   # BIOS and UEFI boot images present
-xorriso -indev NEW.iso -ls /server /server/netcfg
+xorriso -indev NEW.iso -ls /server /server/netcfg /server/addons   # the last one only with add-ons
 ```
 
 `md5sum.txt` of the ISO still lists the original `server/user-data`; a media check reports that file as changed.

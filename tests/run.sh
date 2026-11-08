@@ -93,6 +93,18 @@ expect_fail "gen-netcfg: duplicate column" "$SCRIPTS/gen-netcfg.sh" -t "$REPO/ex
 mkdir -p "$T/bad5"
 cp "$f" "$T/bad5/00-00-5e-00-53.yaml"
 expect_fail "check: incomplete MAC" "$SCRIPTS/check.sh" "$T/bad5"
+
+# add-on folders
+mkdir -p "$T/addons/one" "$T/addons/noinstall" "$T/addons/badsyntax" "$T/other/one"
+# shellcheck disable=SC2016
+printf 'echo "$1 -> $2" > "$2/addon-one.txt"\n' > "$T/addons/one/install.sh"
+printf 'echo hi\n' > "$T/other/one/install.sh"
+printf 'if then\n' > "$T/addons/badsyntax/install.sh"
+expect_ok "check: add-on" "$SCRIPTS/check.sh" -a "$T/addons/one"
+expect_fail "check: add-on without install.sh" "$SCRIPTS/check.sh" -a "$T/addons/noinstall"
+expect_fail "check: add-on with syntax error" "$SCRIPTS/check.sh" -a "$T/addons/badsyntax"
+expect_fail "check: add-on is no directory" "$SCRIPTS/check.sh" -a "$T/addons/one/install.sh"
+expect_fail "check: add-on names must be unique" "$SCRIPTS/check.sh" -a "$T/addons/one" -a "$T/other/one"
 if [ -n "${ORIGINAL_ISO:-}" ] && command -v xorriso >/dev/null && [ -n "$HASH" ]; then
   xorriso -osirrox on -indev "$ORIGINAL_ISO" -extract /server/user-data "$T/orig" >/dev/null 2>&1
   chmod u+w "$T/orig"
@@ -118,8 +130,9 @@ import sys, yaml
 d = yaml.safe_load(open(sys.argv[1]))["autoinstall"]
 open(sys.argv[2] + "/early.sh", "w").write(d["early-commands"][0])
 open(sys.argv[2] + "/late.sh", "w").write(d["late-commands"][0])
+open(sys.argv[2] + "/addons.sh", "w").write(d["late-commands"][1])
 PY
-    for s in early late; do
+    for s in early late addons; do
       sed -e "s#/cdrom#$R/cdrom#g; s#/sys/class/net#$R/sys/class/net#g; s#/run/autoinstall-netcfg#$R/run#g" \
           -e "s#/etc/netplan#$R/etc/netplan#g; s#/target#$R/target#g; s#sleep 180#sleep 0#" \
           "$T/$s.sh" > "$T/$s-test.sh"
@@ -134,6 +147,17 @@ PY
     expect_ok "late-commands: NTP servers" test "$(cat "$R/target/etc/chrony/sources.d/autoinstall.sources")" = \
       "$(printf 'server 192.0.2.1 iburst\nserver 192.0.2.2 iburst')"
     expect_ok "late-commands: pools disabled" grep -qx '#pool ntp.ubuntu.com iburst' "$R/target/etc/chrony/sources.d/ubuntu-ntp-pools.sources"
+    expect_ok "add-on late-command: no add-ons is a no-op" sh "$T/addons-test.sh"
+    mkdir -p "$R/cdrom/server/addons"
+    cp -r "$T/addons/one" "$R/cdrom/server/addons/one"
+    mkdir "$R/cdrom/server/addons/noscript"
+    expect_ok "add-on late-command: runs install.sh" sh "$T/addons-test.sh"
+    expect_ok "add-on late-command: arguments (folder, target)" \
+      grep -qx "$R/cdrom/server/addons/one -> $R/target" "$R/target/addon-one.txt"
+    mkdir "$R/cdrom/server/addons/zfail"
+    printf 'exit 3\n' > "$R/cdrom/server/addons/zfail/install.sh"
+    expect_fail "add-on late-command: failing add-on aborts" sh "$T/addons-test.sh"
+    rm -rf "$R/cdrom/server/addons"
     echo 02:00:00:00:00:02 > "$R/sys/class/net/eth1/address"
     expect_fail "early-commands: abort without matching file" sh "$T/early-test.sh"
     expect_ok "early-commands: abort lists MACs" grep -q 'eth1: 02:00:00:00:00:02' "$T/last"
@@ -152,6 +176,11 @@ PY
   expect_ok "update-stick: netcfg replaced" diff -r "$REPO/examples/netcfg" "$S/server/netcfg"
   expect_ok "update-stick: second run" env PASSWORD_HASH="$HASH" "$SCRIPTS/update-stick.sh" -u admin -n "$REPO/examples/netcfg" "$S"
   expect_ok "update-stick: original still unchanged" cmp -s "$T/orig" "$S/server/user-data-original"
+  expect_ok "update-stick: no add-ons by default" test ! -e "$S/server/addons"
+  expect_ok "update-stick: with add-on" env PASSWORD_HASH="$HASH" "$SCRIPTS/update-stick.sh" -u admin -n "$REPO/examples/netcfg" -a "$T/addons/one" "$S"
+  expect_ok "update-stick: add-on copied" cmp -s "$T/addons/one/install.sh" "$S/server/addons/one/install.sh"
+  expect_ok "update-stick: run without add-ons removes them" env PASSWORD_HASH="$HASH" "$SCRIPTS/update-stick.sh" -u admin -n "$REPO/examples/netcfg" "$S"
+  expect_ok "update-stick: add-ons gone" test ! -e "$S/server/addons"
 else
   sk "make-user-data, early-/late-commands, update-stick with the original file (set ORIGINAL_ISO, needs xorriso, openssl)"
 fi

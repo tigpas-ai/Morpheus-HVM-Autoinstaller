@@ -2,10 +2,12 @@
 # check.sh - validate netcfg files and a generated user-data before building media.
 #
 # Usage:
-#   check.sh [-u USER_DATA] [NETCFG_DIR]
+#   check.sh [-u USER_DATA] [-a ADDON_DIR]... [NETCFG_DIR]
 #
 #   -u USER_DATA  generated server/user-data: YAML syntax, no placeholders left,
 #                 shell syntax of early-commands, late-commands and runcmd
+#   -a ADDON_DIR  add-on folder (repeatable): a directory with install.sh, usable folder name,
+#                 names unique (the folder is stored as server/addons/<name>/)
 #   NETCFG_DIR    directory with <mac|serial>.yaml files: file names, "# HOSTNAME=" line,
 #                 optional "# NTP=" line, YAML syntax and a top-level "network" key
 #
@@ -15,10 +17,11 @@ set -euo pipefail
 
 usage() { sed -n '2,/^set -euo/p' "$0" | sed '$d; s/^# \{0,1\}//'; exit "${1:-2}"; }
 
-user_data=""
-while getopts "u:h" opt; do
+user_data="" addons=()
+while getopts "u:a:h" opt; do
   case "$opt" in
     u) user_data=$OPTARG ;;
+    a) addons+=("$OPTARG") ;;
     h) usage 0 ;;
     *) usage ;;
   esac
@@ -26,7 +29,7 @@ done
 shift $((OPTIND - 1))
 [ $# -le 1 ] || usage
 netcfg=${1:-}
-[ -n "$user_data" ] || [ -n "$netcfg" ] || usage
+[ -n "$user_data" ] || [ -n "$netcfg" ] || [ ${#addons[@]} -gt 0 ] || usage
 
 errors=0
 err() { echo "ERROR: $*" >&2; errors=$((errors + 1)); }
@@ -92,6 +95,18 @@ if [ -n "$netcfg" ]; then
     ok "$name -> $short${ntp:+ (NTP $ntp)}"
   done
 fi
+
+declare -A addon_names=()
+for a in ${addons[@]+"${addons[@]}"}; do
+  if [ ! -d "$a" ]; then err "add-on $a: not a directory"; continue; fi
+  name=$(basename "$(realpath "$a")")
+  if [[ ! "$name" =~ ^[0-9A-Za-z][0-9A-Za-z._-]*$ ]]; then err "add-on $a: unusable folder name '$name'"; continue; fi
+  if [ ! -f "$a/install.sh" ]; then err "add-on $name: no install.sh"; continue; fi
+  if [ -n "${addon_names[$name]:-}" ]; then err "add-on $name: folder name used twice"; continue; fi
+  addon_names[$name]=1
+  if ! out=$(bash -n "$a/install.sh" 2>&1); then err "add-on $name: install.sh: $out"; continue; fi
+  ok "add-on $name"
+done
 
 if [ -n "$user_data" ]; then
   [ -f "$user_data" ] || { echo "error: $user_data not found" >&2; exit 1; }

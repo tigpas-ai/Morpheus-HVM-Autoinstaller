@@ -60,7 +60,8 @@ That is the whole autoinstaller. The scripts add checks on top ([docs/build.md](
 
 ## Scope
 Only the unattended installation itself plus the two 9.1.0-1 fixes. No performance tuning, no extra packages, no
-site-specific settings – add those to your own copy of the patch if needed.
+site-specific settings in the repository – but folders with your own additions can be put on the medium and are run at
+the end of the installation ([add-ons](docs/how-it-works.md#add-ons)). Or add changes to your own copy of the patch.
 
 ## References
 - [HPE Morpheus Software documentation 9.1.0](https://support.hpe.com/hpesc/public/docDisplay?docId=sd00008772en_us&docLocale=en_US)
